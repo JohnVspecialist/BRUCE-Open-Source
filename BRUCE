@@ -1,12 +1,136 @@
-Welcome to BRUCE, a comprehensive text analysis and threat actor profiling system!
-BRUCE is an open-source project that leverages cutting-edge deep learning and natural language processing (NLP) techniques to analyze text data and identify potential threats. The system is designed to be flexible and adaptable, allowing users to customize and extend its functionality to suit their specific needs.
-BRUCE includes the following features:
-Text Preprocessing: BRUCE uses the BERT tokenizer to preprocess text data, handling tasks such as tokenization, stopword removal, and stemming.
-Custom Dataset Class: BRUCE includes a custom dataset class, TextDataset, which allows users to easily load and manipulate their own text datasets.
-BERT Model and Tokenizer: BRUCE utilizes the BERT model and tokenizer from the transformers library to analyze text data and generate embeddings.
-Threat Actor Profiling Model: BRUCE includes a custom threat actor profiling model, ThreatActorProfilingModel, which uses the BERT model and adds a linear layer on top to generate threat actor embeddings.
-Text Analysis Model: BRUCE also includes a custom text analysis model, TextAnalysisModel, which is similar to the threat actor profiling model but has a different linear layer.
-Adversarial Training: BRUCE includes an adversarial training function, adversarial_training, which generates adversarial examples using the Fast Gradient Sign Method (FGSM) and trains the model using these examples.
-Data Loaders: BRUCE uses data loaders from the torch.utils.data library to handle data loading and batching.
-Training: BRUCE includes training loops for both the threat actor profiling model and the text analysis model.
-BRUCE is designed to be easy to use and extend, with a modular architecture that allows users to add new functionality and models as needed. Whether you're a researcher, analyst, or developer, BRUCE provides a powerful toolset for text analysis and threat actor profiling.
+# Install required libraries and dependencies
+!pip install torch
+!pip install transformers
+!pip install spacy
+!pip install pandas
+!pip install numpy
+!pip install sklearn
+
+# Import necessary libraries
+import pandas as pd
+import numpy as np
+import torch
+from transformers import BertTokenizer, BertModel
+from sklearn.metrics import f1_score
+from sklearn.model_selection import train_test_split
+from spacy import displacy
+from torch.utils.data import Dataset, DataLoader
+import torch.nn as nn
+import torch.optim as optim
+
+# Define a custom dataset class for our text data
+class TextDataset(Dataset):
+def __init__(self, texts, labels):
+self.texts = texts
+self.labels = labels
+
+def __len__(self):
+return len(self.texts)
+
+def __getitem__(self, idx):
+text = self.texts[idx]
+label = self.labels[idx]
+
+# Preprocess the text using BERT tokenizer
+input_ids = tokenizer.encode(text, return_tensors='pt')
+attention_mask = tokenizer.encode(text, return_tensors='pt', max_length=512, padding='max_length', truncation=True)
+
+return {
+'input_ids': input_ids,
+'attention_mask': attention_mask,
+'label': label
+}
+
+# Load the dataset and create a custom dataset instance
+dataset = pd.read_csv('dataset.csv')
+text_dataset = TextDataset(dataset['text'], dataset['label'])
+
+# Split the dataset into training and testing sets
+train_texts, test_texts, train_labels, test_labels = train_test_split(text_dataset, dataset['label'], test_size=0.2, random_state=42)
+
+# Create data loaders for training and testing
+train_loader = DataLoader(train_texts, batch_size=32, shuffle=True)
+test_loader = DataLoader(test_texts, batch_size=32, shuffle=False)
+
+# Define the BERT model and tokenizer
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+model = BertModel.from_pretrained('bert-base-uncased')
+
+# Define a custom threat actor profiling model
+class ThreatActorProfilingModel(nn.Module):
+def __init__(self):
+super(ThreatActorProfilingModel, self).__init__()
+self.bert = BertModel.from_pretrained('bert-base-uncased')
+self.linear = nn.Linear(768, 128)
+
+def forward(self, input_ids, attention_mask):
+outputs = self.bert(input_ids, attention_mask=attention_mask)
+last_hidden_state = outputs.last_hidden_state
+threat_actor_embeddings = self.linear(last_hidden_state)
+return threat_actor_embeddings
+
+# Initialize the threat actor profiling model
+threat_actor_model = ThreatActorProfilingModel()
+
+# Define a custom text analysis model
+class TextAnalysisModel(nn.Module):
+def __init__(self):
+super(TextAnalysisModel, self).__init__()
+self.bert = BertModel.from_pretrained('bert-base-uncased')
+self.linear = nn.Linear(768, 128)
+
+def forward(self, input_ids, attention_mask):
+outputs = self.bert(input_ids, attention_mask=attention_mask)
+last_hidden_state = outputs.last_hidden_state
+text_embeddings = self.linear(last_hidden_state)
+return text_embeddings
+
+# Initialize the text analysis model
+text_analysis_model = TextAnalysisModel()
+
+# Define a custom adversarial training function
+def adversarial_training(model, inputs, labels, epsilon=0.1):
+# Generate adversarial examples using FGSM
+adv_inputs = inputs + epsilon * torch.sign(torch.autograd.grad(model(inputs), inputs, retain_graph=True)[0])
+
+# Zero the gradients
+optimizer = optim.Adam(model.parameters())
+optimizer.zero_grad()
+
+# Forward pass with adversarial examples
+outputs = model(adv_inputs)
+
+# Calculate the loss
+loss = nn.CrossEntropyLoss()(outputs, labels)
+
+# Backward pass
+loss.backward()
+
+# Update the model parameters
+optimizer.step()
+
+return model
+
+# Train the threat actor profiling model with adversarial training
+for epoch in range(5):
+for batch in train_loader:
+input_ids = batch['input_ids'].to(device)
+attention_mask = batch['attention_mask'].to(device)
+labels = batch['label'].to(device)
+
+# Adversarial training
+threat_actor_model = adversarial_training(threat_actor_model, input_ids, labels)
+
+# Forward pass
+outputs = threat_actor_model(input_ids, attention_mask=attention_mask)
+
+# Train the text analysis model
+for epoch in range(5):
+for batch in train_loader:
+input_ids = batch['input_ids'].to(device)
+attention_mask = batch['attention_mask'].to(device)
+labels = batch['label'].to(device)
+
+# Forward pass
+outputs
+
